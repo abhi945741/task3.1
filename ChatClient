@@ -1,0 +1,64 @@
+import java.io.*;
+import java.net.*;
+import java.util.Scanner;
+
+public class ChatClient {
+    private static final String SERVER_HOST = "localhost";
+    private static final int SERVER_PORT = 5000;
+
+    public static void main(String[] args) {
+        System.out.println("🔗 Connecting to chat server " + SERVER_HOST + ":" + SERVER_PORT + " ...");
+        try (Socket socket = new Socket(SERVER_HOST, SERVER_PORT);
+             BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+             PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+             Scanner console = new Scanner(System.in)) {
+
+            // thread to read server messages
+            Thread readerThread = new Thread(() -> {
+                try {
+                    String line;
+                    while ((line = in.readLine()) != null) {
+                        if (line.startsWith("SUBMITNAME")) {
+                            System.out.print("Enter username: ");
+                        } else if (line.startsWith("NAMEACCEPTED")) {
+                            String name = line.substring("NAMEACCEPTED".length()).trim();
+                            System.out.println("✅ Name accepted: " + name);
+                            System.out.println("Type messages. Use /quit to exit.");
+                        } else if (line.startsWith("NAMEINUSE")) {
+                            System.out.println("⚠️ Username already taken. Try another: ");
+                        } else if (line.startsWith("BYE")) {
+                            System.out.println("❌ Disconnected by server.");
+                            break;
+                        } else if (line.startsWith("MESSAGE ")) {
+                            System.out.println(line.substring("MESSAGE ".length()));
+                        } else {
+                            System.out.println(line);
+                        }
+                    }
+                } catch (IOException e) {
+                    System.out.println("❌ Connection closed.");
+                }
+            });
+            readerThread.setDaemon(true);
+            readerThread.start();
+
+            // main loop: read user input
+            while (true) {
+                if (!console.hasNextLine()) break;
+                String line = console.nextLine();
+                if (line == null) break;
+                line = line.trim();
+                if (line.isEmpty()) continue;
+
+                out.println(line);
+
+                if (line.equalsIgnoreCase("/quit") || line.equalsIgnoreCase("/exit")) {
+                    System.out.println("👋 You have left the chat.");
+                    break;
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("❌ Could not connect: " + e.getMessage());
+        }
+    }
+}
